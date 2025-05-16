@@ -1,6 +1,5 @@
 import { ethers } from "ethers";
 import * as dotenv from "dotenv";
-import * as cron from "node-cron";
 
 dotenv.config();
 
@@ -32,6 +31,7 @@ const ABI = [
 // Configuration
 const MAX_RETRIES = 5;
 const RETRY_DELAY_MS = 30000; // 30 seconds
+const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000; // 12 hours in milliseconds
 
 // Initialize provider and wallet
 const provider = new ethers.JsonRpcProvider(
@@ -111,11 +111,30 @@ async function runInteraction(): Promise<void> {
       `[${new Date().toISOString()}] Starting Aavegotchi interaction...`
     );
     await interactWithGotchis();
+
+    // Schedule the next run in 12 hours
+    const nextRunDate = new Date(Date.now() + TWELVE_HOURS_MS);
+    console.log(
+      `[${new Date().toISOString()}] Next interaction scheduled for ${nextRunDate.toISOString()}`
+    );
+
+    setTimeout(() => {
+      runInteraction().catch(console.error);
+    }, TWELVE_HOURS_MS);
   } catch (error) {
     console.error(
       `[${new Date().toISOString()}] Error in main execution:`,
       error
     );
+
+    // If there was an error, try again in 5 minutes
+    console.log(
+      `[${new Date().toISOString()}] Will retry in 5 minutes due to error`
+    );
+
+    setTimeout(() => {
+      runInteraction().catch(console.error);
+    }, 5 * 60 * 1000); // 5 minutes in milliseconds
   }
 }
 
@@ -129,11 +148,6 @@ console.log(
 
 // Run on startup
 runInteraction();
-
-// Schedule to run every 12 hours (at minute 0 of hours 0, 12)
-cron.schedule("0 0,12 * * *", () => {
-  runInteraction().catch(console.error);
-});
 
 // Keep the process running
 process.on("SIGINT", () => {

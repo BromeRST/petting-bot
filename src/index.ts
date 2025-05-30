@@ -32,6 +32,7 @@ const ABI = [
 const MAX_RETRIES = 5;
 const RETRY_DELAY_MS = 30000; // 30 seconds
 const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000; // 12 hours in milliseconds
+const ONE_HOUR_MS = 60 * 60 * 1000; // 1 hour in milliseconds
 
 // Initialize provider and wallet
 const provider = new ethers.JsonRpcProvider(
@@ -78,6 +79,9 @@ async function interactWithGotchis(retries = 0): Promise<void> {
         TOKEN_IDS.length
       } Aavegotchis`
     );
+
+    // Schedule next run in 12 hours
+    scheduleNextRun();
   } catch (error) {
     console.error(
       `[${new Date().toISOString()}] Error interacting with Aavegotchis:`,
@@ -100,42 +104,38 @@ async function interactWithGotchis(retries = 0): Promise<void> {
       console.error(
         `[${new Date().toISOString()}] Maximum retry attempts reached. Please check your configuration.`
       );
+
+      // Still schedule next run even after max retries
+      scheduleNextRun();
     }
   }
 }
 
-// Function to execute the interaction immediately
-async function runInteraction(): Promise<void> {
-  try {
+/**
+ * Schedule the next run to happen in 12 hours
+ */
+function scheduleNextRun(): void {
+  const nextRunTime = new Date(Date.now() + TWELVE_HOURS_MS);
+
+  console.log(
+    `[${new Date().toISOString()}] Next interaction scheduled for ${nextRunTime.toISOString()}`
+  );
+
+  setTimeout(() => {
     console.log(
-      `[${new Date().toISOString()}] Starting Aavegotchi interaction...`
+      `[${new Date().toISOString()}] It's time for the next interaction!`
     );
-    await interactWithGotchis();
+    interactWithGotchis().catch(console.error);
+  }, TWELVE_HOURS_MS);
+}
 
-    // Schedule the next run in 12 hours
-    const nextRunDate = new Date(Date.now() + TWELVE_HOURS_MS);
-    console.log(
-      `[${new Date().toISOString()}] Next interaction scheduled for ${nextRunDate.toISOString()}`
-    );
-
-    setTimeout(() => {
-      runInteraction().catch(console.error);
-    }, TWELVE_HOURS_MS);
-  } catch (error) {
-    console.error(
-      `[${new Date().toISOString()}] Error in main execution:`,
-      error
-    );
-
-    // If there was an error, try again in 5 minutes
-    console.log(
-      `[${new Date().toISOString()}] Will retry in 5 minutes due to error`
-    );
-
-    setTimeout(() => {
-      runInteraction().catch(console.error);
-    }, 5 * 60 * 1000); // 5 minutes in milliseconds
-  }
+/**
+ * Print a heartbeat message to show the bot is still running
+ */
+function startHeartbeat(): void {
+  setInterval(() => {
+    console.log(`[${new Date().toISOString()}] ♥ Bot is still running`);
+  }, ONE_HOUR_MS);
 }
 
 // Main execution
@@ -146,10 +146,13 @@ console.log(
   } Aavegotchis every 12 hours`
 );
 
-// Run on startup
-runInteraction();
+// Run immediately
+interactWithGotchis().catch(console.error);
 
-// Keep the process running
+// Start the heartbeat
+startHeartbeat();
+
+// Handle graceful shutdown
 process.on("SIGINT", () => {
   console.log(`[${new Date().toISOString()}] Bot stopped by user`);
   process.exit(0);
